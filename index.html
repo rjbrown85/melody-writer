@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Melody Writer</title>
+<meta name="description" content="Write melodies over chord progressions with scale, arpeggio, and riff blocks, and see which notes clash before you sing them.">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="mast">
+  <h1><span class="cut c1">Melody</span><span class="cut c2">Writer</span></h1>
+  <div class="file">
+    <label class="sr" for="songName">Song name</label>
+    <input id="songName" type="text" maxlength="60" spellcheck="false" placeholder="Untitled melody">
+    <button class="btn sm" id="saveBtn" type="button" title="Save this song in your browser">Save</button>
+    <label class="sr" for="openSel">Open a saved song</label>
+    <select id="openSel" title="Open a saved song"></select>
+    <details class="menu">
+      <summary class="btn sm">File</summary>
+      <div class="menu-pop">
+        <button type="button" id="newBtn">New song</button>
+        <button type="button" id="saveAsBtn">Save a copy as…</button>
+        <button type="button" id="delSongBtn">Delete this saved song</button>
+        <hr>
+        <button type="button" id="exportJson">Export song file (.json)</button>
+        <button type="button" id="importJson">Import song file…</button>
+        <button type="button" id="exportMidi">Export MIDI (.mid) for Logic or GarageBand</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+    </details>
+    <button class="btn sm" id="helpBtn" type="button" aria-expanded="false" aria-controls="help">Guide</button>
+  </div>
+</header>
+
+<section id="help" class="panel help" hidden>
+  <div class="help-cols">
+    <div>
+      <h2>How it works</h2>
+      <ol>
+        <li><b>Pick the changes.</b> Load a progression from the library or build your own chord by chord. Songs run up to 32 bars.</li>
+        <li><b>Add melody.</b> Pick a block on the left and click the grid where its first note goes, draw notes by hand, or record from your computer keys or a MIDI keyboard.</li>
+        <li><b>Shape it.</b> Select notes and use the tools above the grid to trim a run, drop every other note, slow it down, or delete notes and close the gap.</li>
+        <li><b>Check the colors.</b> Every note is graded against the chord under it. Hover a note to read why.</li>
+      </ol>
+      <h2>Note colors</h2>
+      <ul class="legend-list">
+        <li><i class="sw chord"></i><b>Green, chord tone.</b> Safe to land on and hold.</li>
+        <li><i class="sw scale"></i><b>White, scale tone.</b> Fits the chord's scale. Good for moving through.</li>
+        <li><i class="sw blue"></i><b>Blue, blue note.</b> A bluesy rub that sounds intentional.</li>
+        <li><i class="sw passing"></i><b>Dashed, passing tone.</b> Outside or rubbing, but short and off the beat, so it passes.</li>
+        <li><i class="sw avoid"></i><b>Yellow, avoid note.</b> A half step above a chord tone. Fine when it moves on, harsh when held.</li>
+        <li><i class="sw outside"></i><b>Orange, outside.</b> Not in the chord's scale. Check that you meant it.</li>
+        <li><i class="sw clash"></i><b>Red, clash.</b> Grinds a half step against a chord tone on a strong beat or held.</li>
+      </ul>
+      <p class="small">Strict mode ignores context and flags anything outside the key. The row shading shows the same thing before you place a note: green rows are chord tones, white rows fit, gray rows are outside.</p>
+    </div>
+    <div>
+      <h2>Keys</h2>
+      <dl class="keys">
+        <dt>Space</dt><dd>Play or stop</dd>
+        <dt>R</dt><dd>Record or stop recording</dd>
+        <dt>A W S E D F T G Y H U J K</dt><dd>Play notes (computer keys on). Z and X move the octave.</dd>
+        <dt>Delete</dt><dd>Delete selected notes</dd>
+        <dt>Shift + Delete</dt><dd>Delete and close the gap</dd>
+        <dt>↑ ↓</dt><dd>Move selected notes one scale step</dd>
+        <dt>Shift + ↑ ↓</dt><dd>Move an octave</dd>
+        <dt>← →</dt><dd>Nudge by the snap value</dd>
+        <dt>⌘/Ctrl + Z</dt><dd>Undo (add Shift to redo)</dd>
+        <dt>⌘/Ctrl + D</dt><dd>Duplicate selection</dd>
+        <dt>⌘/Ctrl + A</dt><dd>Select all notes</dd>
+        <dt>Double-click</dt><dd>On empty grid: add a note. On a note: select its whole block.</dd>
+        <dt>Option/Alt + drag</dt><dd>Copy notes as you drag</dd>
+        <dt>Esc</dt><dd>Stop placing a block, clear selection</dd>
+      </dl>
+      <h2>Credits</h2>
+      <p class="small">Piano: Salamander Grand Piano by Alexander Holm (CC BY 3.0), via the Tone.js audio repo. Audio engine: Tone.js (MIT). Progressions, riff blocks, and the chord-scale engine come from <a href="https://rjbrown85.github.io/Vocallicks/">Vocallicks</a>; the five building blocks are Crystal Cherelle's (Indie Artist School). Fonts: Dela Gothic One, Courier Prime, Permanent Marker (OFL and Apache).</p>
+    </div>
+  </div>
+</section>
+
+<div class="transport" id="transport">
+  <div class="tgroup">
+    <button class="btn play" id="playBtn" type="button" title="Play or stop (Space)"><span class="ico">▶</span><span class="lbl">Play</span></button>
+    <button class="btn rec" id="recBtn" type="button" title="Record"><span class="ico">●</span><span class="lbl">Record</span></button>
+    <button class="tog" id="loopBtn" type="button" aria-pressed="true" title="Loop the shaded range">Loop</button>
+    <button class="tog" id="clickBtn" type="button" aria-pressed="false" title="Metronome">Click</button>
+    <button class="tog" id="countBtn" type="button" aria-pressed="true" title="One bar of clicks before recording">Count-in</button>
+    <button class="tog" id="followBtn" type="button" aria-pressed="true" title="Scroll with the playhead">Follow</button>
+  </div>
+  <div class="tgroup">
+    <span class="fld tempo"><span class="fl">Tempo</span>
+      <button class="mini" type="button" id="bpmDown" aria-label="Slower">−</button>
+      <input id="bpm" type="number" min="40" max="200" step="1" aria-label="Tempo in bpm">
+      <button class="mini" type="button" id="bpmUp" aria-label="Faster">+</button></span>
+  </div>
+  <div class="tgroup inputs">
+    <button class="tog" id="kbBtn" type="button" aria-pressed="true" title="Play notes with A W S E D… on your computer keyboard">Computer keys</button>
+    <span class="fld oct"><span class="fl">Octave</span>
+      <button class="mini" type="button" id="octDown" aria-label="Octave down (Z)">−</button><b id="octVal">C4</b>
+      <button class="mini" type="button" id="octUp" aria-label="Octave up (X)">+</button></span>
+    <button class="tog" id="midiBtn" type="button" aria-pressed="false" title="Connect a USB MIDI keyboard">MIDI keyboard</button>
+    <label class="fld"><span class="fl">Record snap</span><select id="quantSel">
+      <option value="0">Off</option><option value="0.25">1/16</option><option value="0.3333333333">1/8 triplet</option><option value="0.5">1/8</option><option value="1">1/4</option></select></label>
+    <details class="menu mix">
+      <summary class="tog">Mix &amp; more</summary>
+      <div class="menu-pop">
+        <label>Record snap strength <select id="qstrSel">
+          <option value="1">100% (exactly on the grid)</option><option value="0.75">75%</option><option value="0.5">50% (keeps some feel)</option></select></label>
+        <label>Melody <input type="range" id="volMel" min="0" max="1" step="0.05"></label>
+        <label>Chords <input type="range" id="volChd" min="0" max="1" step="0.05"></label>
+        <label>Click <input type="range" id="volClk" min="0" max="1" step="0.05"></label>
+        <p class="small" id="soundStatus">Loading the grand piano…</p>
+      </div>
+    </details>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+</div>
+
+<section class="panel chords" aria-labelledby="chordsHead">
+  <div class="phead">
+    <h2 id="chordsHead" class="tag">Chords</h2>
+    <p class="meta" id="chordMeta"></p>
+    <div class="row">
+      <details class="menu lib" id="libMenu">
+        <summary class="btn sm pri">Progression library</summary>
+        <div class="menu-pop lib-pop">
+          <div class="lib-opts">
+            <label>Each chord lasts <select id="libBars"><option value="0.5">Half as long</option><option value="1" selected>As written (about a bar)</option><option value="2">Twice as long</option></select></label>
+            <label>Repeat <select id="libRep"><option value="1">Once</option><option value="2" selected>Twice</option><option value="4">4 times</option></select></label>
+          </div>
+          <div id="libList" class="lib-list"></div>
+        </div>
+      </details>
+      <button class="btn sm" id="saveProg" type="button">Save as my progression</button>
+      <button class="btn sm" id="repeatAll" type="button" title="Copy the whole progression onto the end">Repeat all</button>
+      <button class="btn sm" id="addChord" type="button">+ Chord</button>
+    </div>
+  </div>
+  <div class="row songset">
+    <label class="fld"><span class="fl">Key</span><select id="keySel"></select></label>
+    <label class="fld"><span class="fl">Scale</span><select id="tonSel"></select></label>
+    <label class="fld"><span class="fl">Chord sound</span><select id="voiceSel"></select></label>
+    <label class="fld"><span class="fl">Chords play</span><select id="patSel">
+      <option value="held">Once per bar</option><option value="halves">Half notes</option><option value="quarters">Quarter notes</option><option value="off">Muted</option></select></label>
+  </div>
+  <div class="chart" id="chart" role="listbox" aria-label="Chord chart. Click a chord to change it."></div>
+  <div class="ched" id="chordEd" hidden>
+    <div class="row ched-tools">
+      <b id="chedName" class="ched-name"></b>
+      <span class="fld"><span class="fl">Beats</span>
+        <button class="mini" type="button" id="beatsDown" aria-label="Fewer beats">−</button><b id="beatsVal">4</b>
+        <button class="mini" type="button" id="beatsUp" aria-label="More beats">+</button></span>
+      <button class="btn sm" type="button" id="chLeft" title="Move left">←</button>
+      <button class="btn sm" type="button" id="chRight" title="Move right">→</button>
+      <button class="btn sm" type="button" id="chSeventh">Add/remove 7th</button>
+      <button class="btn sm" type="button" id="chDup">Duplicate</button>
+      <button class="btn sm" type="button" id="chDel">Delete</button>
+      <button class="btn sm pri" type="button" id="chDone">Done</button>
+    </div>
+    <div class="pal">
+      <span class="pal-lbl">In the key</span><div id="palDia" class="pal-row"></div>
+    </div>
+    <div class="pal">
+      <span class="pal-lbl">Borrowed and secondary</span><div id="palOther" class="pal-row"></div>
+    </div>
+  </div>
+</section>
+
+<main class="work">
+  <aside class="panel blocks" aria-labelledby="blocksHead">
+    <details id="blocksWrap" open>
+      <summary><h2 id="blocksHead" class="tag">Blocks</h2> <span class="small tap">tap to show or hide</span></summary>
+      <div class="bopts">
+        <label>Built on <select id="bRoot"></select></label>
+        <label>Direction <select id="bDir"></select></label>
+        <label>Notes <input type="number" id="bN" min="2" max="15"></label>
+        <label>Rhythm <select id="bRhy"></select></label>
+        <label class="chk"><input type="checkbox" id="bHold"> Hold the last note</label>
+        <p class="small" id="bNote"></p>
+      </div>
+      <div id="blockList" class="blist"></div>
+    </details>
+  </aside>
+
+  <section class="panel roll" aria-label="Melody">
+    <div class="rtools">
+      <div class="row">
+        <div class="seg" role="group" aria-label="Tool">
+          <button type="button" class="tog" data-tool="select" aria-pressed="true">Select</button>
+          <button type="button" class="tog" data-tool="draw" aria-pressed="false">Draw</button>
+          <button type="button" class="tog" data-tool="erase" aria-pressed="false">Erase</button>
+        </div>
+        <label class="fld"><span class="fl">Snap</span><select id="snapSel">
+          <option value="0.25">1/16</option><option value="0.3333333333">1/8 triplet</option><option value="0.5">1/8</option><option value="1">1/4</option><option value="0.0625">Fine</option></select></label>
+        <label class="fld"><span class="fl">Colors</span><select id="clashSel">
+          <option value="on">Grade by chord</option><option value="strict">Strict: key only</option><option value="off">Off</option></select></label>
+        <span class="fld"><span class="fl">Zoom</span>
+          <button class="mini" type="button" id="zoomOut" aria-label="Zoom out">−</button>
+          <button class="mini" type="button" id="zoomIn" aria-label="Zoom in">+</button></span>
+        <details class="menu rng">
+          <summary class="tog" id="rangeTog">My range</summary>
+          <div class="menu-pop">
+            <label class="chk"><input type="checkbox" id="rangeOn"> Shade notes outside my range</label>
+            <label>Lowest <select id="rangeLo"></select></label>
+            <label>Highest <select id="rangeHi"></select></label>
+          </div>
+        </details>
+        <button class="btn sm" type="button" id="undoBtn" title="Undo (⌘/Ctrl+Z)">Undo</button>
+        <button class="btn sm" type="button" id="redoBtn" title="Redo (⌘/Ctrl+Shift+Z)">Redo</button>
+      </div>
+      <div class="row seltools" id="selTools">
+        <span class="selinfo" id="selInfo">Nothing selected</span>
+        <button type="button" class="btn xs" data-act="delete" title="Delete">Delete</button>
+        <button type="button" class="btn xs" data-act="ripple" title="Delete and slide the rest of the block left">Delete &amp; close gap</button>
+        <button type="button" class="btn xs" data-act="close" title="Slide notes together so there are no rests between them">Close gaps</button>
+        <span class="keepn"><button type="button" class="btn xs" data-act="keep">Keep first</button><input type="number" id="keepN" min="1" max="64" value="3" aria-label="How many notes to keep"></span>
+        <button type="button" class="btn xs" data-act="other">Every other</button>
+        <button type="button" class="btn xs" data-act="slow" title="Half speed">½ speed</button>
+        <button type="button" class="btn xs" data-act="fast" title="Double speed">2× speed</button>
+        <button type="button" class="btn xs" data-act="reverse">Reverse</button>
+        <button type="button" class="btn xs" data-act="up" title="Up one scale step">Step ↑</button>
+        <button type="button" class="btn xs" data-act="down" title="Down one scale step">Step ↓</button>
+        <button type="button" class="btn xs" data-act="octup">Oct ↑</button>
+        <button type="button" class="btn xs" data-act="octdown">Oct ↓</button>
+        <button type="button" class="btn xs" data-act="dup">Duplicate</button>
+        <button type="button" class="btn xs" data-act="play">Play these</button>
+      </div>
+    </div>
+    <p class="armed" id="armedBar" hidden></p>
+    <div class="rollwrap" id="rollWrap">
+      <div class="scroller" id="scroller"><div class="spacer" id="spacer"></div></div>
+      <canvas id="rollCanvas" tabindex="0" aria-label="Piano roll. Arrow keys move selected notes."></canvas>
+    </div>
+    <p class="info" id="info">Hover a note to see how it fits the chord.</p>
+  </section>
+</main>
+
+<script src="vendor/Tone.min.js"></script>
+<script src="js/theory.js"></script>
+<script src="js/data.js"></script>
+<script src="js/music.js"></script>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/roll.js"></script>
+<script src="js/chords.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/input.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
